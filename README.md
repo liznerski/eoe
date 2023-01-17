@@ -72,7 +72,7 @@ For this, you can instead execute:
 
     virtualenv -p python3 eoe/data/venv 
     source eoe/data/venv/bin/activate
-    bash eoe/pip_install_cuda11.sh
+    bash eoe/src/pip_install_cuda11.sh
 
 **Datasets**:
 
