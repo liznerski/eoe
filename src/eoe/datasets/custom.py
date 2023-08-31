@@ -46,13 +46,13 @@ class ADCustomDS(TorchvisionDataset):
         root/custom/train/hazelnut/normal/xxx.png
         root/custom/train/hazelnut/normal/xxy.png
         root/custom/train/hazelnut/normal/xxz.png
-        root/custom/train/hazelnut/anomalous/xxa.png    -- may be used during training for a semi-supervised setting
+        root/custom/train/hazelnut/anomalous/xxa.png    -- may be used during training for OE
 
         root/custom/train/screw/normal/123.png
         root/custom/train/screw/normal/nsdf3.png
-        root/custom/train/screw/anomalous/asd932_.png   -- may be used during training for a semi-supervised setting
+        root/custom/train/screw/anomalous/asd932_.png   -- may be used during training for OE
 
-        The same holds for the test set, where "train" has to be replaced by "test".
+        The same holds for the test set, where "/train/" has to be replaced by "/test/".
 
         @param root: Defines the root directory for this dataset. The dataset always its own subdirectory named 'custom',
             (e.g., eoe/data/datasets/custom/ for root being eoe/data/datasets/).

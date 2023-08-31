@@ -54,7 +54,7 @@ if __name__ == '__main__':
                 root/custom/train/screw/normal/nsdf3.png
                 root/custom/train/screw/anomalous/asd932_.png   -- may be used during training as OE with --oe-dataset custom 
         
-                The same holds for the test set, where "train" has to be replaced by "test" and the anomalies are not 
+                The same holds for the test set, where "/train/" has to be replaced by "/test/", and in (2) the anomalies are not 
                 used as OE but as ground-truth anomalies for testing.
             """
         )

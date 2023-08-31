@@ -48,6 +48,7 @@ If you use our work, please also cite the paper:
 * [Training](#training)
 * [Log Data](#log-data)
 * [Help](#need-help)
+* [Custom Datasets](#custom-datasets)
 
 
 ## Installation
@@ -252,6 +253,42 @@ For experiments finding optimal single OE samples, there are images showing the 
 
 There is also a tensorboard logfile that contains most of the logged data.
 
+## Custom datasets
+
+We also support custom datasets.
+Please use either `eoe/src/eoe/main/train_custom.py` or `eoe/src/eoe/main/evolve_oe_custom.py` for custom data.
+The code looks for the data in `eoe/data/datasets/custom/` and expects the folder to be of the form specified in (1), which follows the
+one-vs-rest approach, or of the form specified in (2), which follows the general AD approach.
+
+The data is expected to be contained in class folders. We distinguish between \
+(1) the one-vs-rest (ovr) approach where one class is considered normal
+and is tested against all other classes being anomalous \
+(2) the general approach where each class folder contains a normal data folder and an anomalous data folder. \
+The default is (2). You can change it to (1) with `--custom-dataset-ovr`.
+
+For (1) the data folders have to follow this structure: 
+
+    eoe/data/datasets/custom/train/dog/xxx.png 
+    eoe/data/datasets/custom/train/dog/xxy.png 
+    eoe/data/datasets/custom/train/dog/xxz.png 
+
+    eoe/data/datasets/custom/train/cat/123.png 
+    eoe/data/datasets/custom/train/cat/nsdf3.png 
+    eoe/data/datasets/custom/train/cat/asd932_.png
+
+For (2): 
+
+    eoe/data/datasets/custom/train/hazelnut/normal/xxx.png 
+    eoe/data/datasets/custom/train/hazelnut/normal/xxy.png 
+    eoe/data/datasets/custom/train/hazelnut/normal/xxz.png
+    eoe/data/datasets/custom/train/hazelnut/anomalous/xxa.png    -- may be used during training as OE with --oe-dataset custom 
+
+    eoe/data/datasets/custom/train/screw/normal/123.png
+    eoe/data/datasets/custom/train/screw/normal/nsdf3.png
+    eoe/data/datasets/custom/train/screw/anomalous/asd932_.png   -- may be used during training as OE with --oe-dataset custom 
+
+The same holds for the test set, where "/train/" has to be replaced by "/test/", and in (2) the anomalies are not 
+used as OE but as ground-truth anomalies for testing.
 
 
 ## Need help?
