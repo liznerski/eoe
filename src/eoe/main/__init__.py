@@ -18,7 +18,7 @@ from deap import base, creator, tools
 from torchvision.datasets import VisionDataset
 from torchvision.transforms import Compose
 
-from eoe.datasets import DS_CHOICES as IMG_DS_CHOICES, load_dataset, DS_PARTS
+from eoe.datasets import DS_CHOICES as IMG_DS_CHOICES, load_dataset, DS_PARTS, ADCustomDS
 from eoe.datasets import MSM
 from eoe.datasets import TRAIN_NOMINAL_ID, TRAIN_OE_ID
 from eoe.datasets import no_classes
@@ -55,12 +55,12 @@ def default_argsparse(modify_descr: Callable[[str, ], str], modify_parser: Calla
         )
     )
     parser.add_argument(
-        '-ds', '--dataset', type=str, default=None, choices=IMG_DS_CHOICES,
+        '-ds', '--dataset', type=str, default=None, choices=tuple(IMG_DS_CHOICES.keys()),
         help="The dataset for which to train the AD model. All datasets have an established train and test split. "
              "During training, use only normal samples from this dataset. For testing, use all samples. "
     )
     parser.add_argument(
-        '-oe', '--oe-dataset', type=str, default=None, choices=IMG_DS_CHOICES + ('none', ),
+        '-oe', '--oe-dataset', type=str, default=None, choices=tuple(IMG_DS_CHOICES.keys()) + ('none', ),
         help="Optional Outlier Exposure (OE) dataset. If given, concatenate an equally sized batch of random "
              "samples from this dataset to the batch of normal training samples from the main dataset. "
              "These concatenated samples are used as auxiliary anomalies. "
@@ -297,6 +297,11 @@ def create_trainer(trainer: str, comment: str, dataset: str, oe_dataset: str, ep
         logger = Logger(pt.join(datapath, 'results', superdir) if logpath is None else logpath, comment)
     else:
         logger = Logger(continue_run + '---CNTD', noname=True)
+
+    if dataset == 'custom' or oe_dataset == 'custom':
+        cstm_classes = ADCustomDS.determine_classes(pt.join(datapath, 'datasets'))
+        IMG_DS_CHOICES['custom']['str_labels'] = cstm_classes
+        IMG_DS_CHOICES['custom']['no_classes'] = len(cstm_classes)
 
     trainer = TRAINER[trainer](
         model, train_transform, val_transform, dataset, oe_dataset, pt.join(datapath, 'datasets'), logger,

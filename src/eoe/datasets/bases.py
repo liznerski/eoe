@@ -240,11 +240,10 @@ class TorchvisionDataset(BaseADDataset):
         @param classes: The labels for which images are shown. Defaults to (0, 1) for normal and anomalous.
         @return: A Tensor of images (n x c x h x w).
         """
-        # assert num_workers>0, otherwise the OnlineSupervisor is initialized with the same shuffling in later workers
         if train:
-            loader, _ = self.loaders(10, num_workers=1, shuffle_train=True)
+            loader, _ = self.loaders(10, num_workers=0, shuffle_train=True)
         else:
-            _, loader = self.loaders(10, num_workers=1, shuffle_test=False)
+            _, loader = self.loaders(10, num_workers=0, shuffle_test=False)
         x, y, out = torch.FloatTensor(), torch.LongTensor(), []
         for xb, yb, _ in loader:
             xb = xb.cuda()
@@ -274,6 +273,8 @@ class TorchvisionDataset(BaseADDataset):
                 break
         for c in sorted(set(y.tolist())):
             out.append(x[y == c][:percls])
+        percls = min(percls, *[o.size(0) for o in out])
+        out = [o[:percls] for o in out]
         return torch.cat(out)
 
     def _update_transforms(self, train_dataset: torch.utils.data.Dataset):

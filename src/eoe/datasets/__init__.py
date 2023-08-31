@@ -14,13 +14,136 @@ from eoe.datasets.imagenetoe import ADImageNetOE
 from eoe.datasets.mnist import ADMNIST, ADEMNIST
 from eoe.datasets.mvtec import ADMvTec
 from eoe.datasets.tinyimages import ADTinyImages
+from eoe.datasets.custom import ADCustomDS
 from eoe.utils.logger import Logger
 from eoe.utils.transformations import TRANSFORMS, get_transform, ConditionalCompose
 
-DS_CHOICES = (  # list of implemented datasets (most can also be used as OE)
-    'cifar10', 'imagenet', 'cifar100', 'imagenet21k', 'tinyimages', 'mvtec', 'imagenetoe', 'fmnist', 'cub', 'dtd',
-    'imagenet21ksubset', 'mnist', 'emnist'
-)
+DS_CHOICES = {  # list of implemented datasets (most can also be used as OE)
+    'cifar10': {
+        'class': ADCIFAR10, 'default_size': 32, 'no_classes': 10, 'oe_only': False,
+        'str_labels':  ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck'],
+    },
+    'imagenet': {
+        'class': ADImageNet, 'default_size': 256, 'no_classes': 30, 'oe_only': False,
+        'str_labels': deepcopy(ADImageNet.ad_classes),
+    },
+    'cifar100': {
+        'class': ADCIFAR100, 'default_size': 32, 'no_classes': 100, 'oe_only': False,
+        'str_labels': [
+            'beaver', 'dolphin', 'otter', 'seal', 'whale',
+            'aquarium_fish', 'flatfish', 'ray', 'shark', 'trout',
+            'orchid', 'poppy', 'rose', 'sunflower', 'tulip',
+            'bottle', 'bowl', 'can', 'cup', 'plate',
+            'apple', 'mushroom', 'orange', 'pear', 'sweet_pepper',
+            'clock', 'keyboard', 'lamp', 'telephone', 'television',
+            'bed', 'chair', 'couch', 'table', 'wardrobe',
+            'bee', 'beetle', 'butterfly', 'caterpillar', 'cockroach',
+            'bear', 'leopard', 'lion', 'tiger', 'wolf',
+            'bridge', 'castle', 'house', 'road', 'skyscraper',
+            'cloud', 'forest', 'mountain', 'plain', 'sea',
+            'camel', 'cattle', 'chimpanzee', 'elephant', 'kangaroo',
+            'fox', 'porcupine', 'possum', 'raccoon', 'skunk',
+            'crab', 'lobster', 'snail', 'spider', 'worm',
+            'baby', 'boy', 'girl', 'man', 'woman',
+            'crocodile', 'dinosaur', 'lizard', 'snake', 'turtle',
+            'hamster', 'mouse', 'rabbit', 'shrew', 'squirrel',
+            'maple_tree', 'oak_tree', 'palm_tree', 'pine_tree', 'willow_tree',
+            'bicycle', 'bus', 'motorcycle', 'pickup_truck', 'train',
+            'lawn_mower', 'rocket', 'streetcar', 'tank', 'tractor'
+        ]
+    },
+    'imagenet21k': {
+        'class': ADImageNet21k, 'default_size': 256, 'no_classes': 21811, 'oe_only': False,
+        'str_labels': [str(i) for i in range(21811)],  # ?
+    },
+    'imagenet21ksubset': {
+        'class': ADImageNet21kSubSet, 'default_size': 256, 'no_classes': 21811, 'oe_only': False,
+        'str_labels': [str(i) for i in range(21811)],  # ?
+    },
+    'tinyimages': {
+        'class': ADTinyImages, 'default_size': 32, 'no_classes': 1, 'oe_only': False, 'str_labels': ['tiny_image'],
+    },
+    'mvtec': {
+        'class': ADMvTec, 'default_size': 256, 'no_classes': 15, 'oe_only': False,
+        'str_labels': [
+            'bottle', 'cable', 'capsule', 'carpet', 'grid', 'hazelnut', 'leather',
+            'metal_nut', 'pill', 'screw', 'tile', 'toothbrush', 'transistor',
+            'wood', 'zipper'
+        ]
+    },
+    'imagenetoe': {
+        'class': ADImageNetOE, 'default_size': 256, 'no_classes': 1000, 'oe_only': True,
+        'str_labels':  list(range(1000)),  # not required
+    },
+    'fmnist': {
+        'class': ADFMNIST, 'default_size': 28, 'no_classes': 10, 'oe_only': False,
+        'str_labels': [
+            'top', 'trouser', 'pullover', 'dress', 'coat', 'sandal', 'shirt', 'sneaker', 'bag', 'ankle_boot'
+        ]
+    },
+    'cub': {
+        'class': ADCUB, 'default_size': 256, 'no_classes': 200, 'oe_only': False,
+        'str_labels': [
+            'Black_footed_Albatross', 'Laysan_Albatross', 'Sooty_Albatross', 'Groove_billed_Ani', 'Crested_Auklet',
+            'Least_Auklet', 'Parakeet_Auklet', 'Rhinoceros_Auklet', 'Brewer_Blackbird', 'Red_winged_Blackbird',
+            'Rusty_Blackbird', 'Yellow_headed_Blackbird', 'Bobolink', 'Indigo_Bunting', 'Lazuli_Bunting', 'Painted_Bunting',
+            'Cardinal', 'Spotted_Catbird', 'Gray_Catbird', 'Yellow_breasted_Chat', 'Eastern_Towhee', 'Chuck_will_Widow',
+            'Brandt_Cormorant', 'Red_faced_Cormorant', 'Pelagic_Cormorant', 'Bronzed_Cowbird', 'Shiny_Cowbird', 'Brown_Creeper',
+            'American_Crow', 'Fish_Crow', 'Black_billed_Cuckoo', 'Mangrove_Cuckoo', 'Yellow_billed_Cuckoo',
+            'Gray_crowned_Rosy_Finch', 'Purple_Finch', 'Northern_Flicker', 'Acadian_Flycatcher', 'Great_Crested_Flycatcher',
+            'Least_Flycatcher', 'Olive_sided_Flycatcher', 'Scissor_tailed_Flycatcher', 'Vermilion_Flycatcher',
+            'Yellow_bellied_Flycatcher', 'Frigatebird', 'Northern_Fulmar', 'Gadwall', 'American_Goldfinch',
+            'European_Goldfinch', 'Boat_tailed_Grackle', 'Eared_Grebe', 'Horned_Grebe', 'Pied_billed_Grebe', 'Western_Grebe',
+            'Blue_Grosbeak', 'Evening_Grosbeak', 'Pine_Grosbeak', 'Rose_breasted_Grosbeak', 'Pigeon_Guillemot',
+            'California_Gull', 'Glaucous_winged_Gull', 'Heermann_Gull', 'Herring_Gull', 'Ivory_Gull', 'Ring_billed_Gull',
+            'Slaty_backed_Gull', 'Western_Gull', 'Anna_Hummingbird', 'Ruby_throated_Hummingbird', 'Rufous_Hummingbird',
+            'Green_Violetear', 'Long_tailed_Jaeger', 'Pomarine_Jaeger', 'Blue_Jay', 'Florida_Jay', 'Green_Jay',
+            'Dark_eyed_Junco', 'Tropical_Kingbird', 'Gray_Kingbird', 'Belted_Kingfisher', 'Green_Kingfisher', 'Pied_Kingfisher',
+            'Ringed_Kingfisher', 'White_breasted_Kingfisher', 'Red_legged_Kittiwake', 'Horned_Lark', 'Pacific_Loon', 'Mallard',
+            'Western_Meadowlark', 'Hooded_Merganser', 'Red_breasted_Merganser', 'Mockingbird', 'Nighthawk', 'Clark_Nutcracker',
+            'White_breasted_Nuthatch', 'Baltimore_Oriole', 'Hooded_Oriole', 'Orchard_Oriole', 'Scott_Oriole', 'Ovenbird',
+            'Brown_Pelican', 'White_Pelican', 'Western_Wood_Pewee', 'Sayornis', 'American_Pipit', 'Whip_poor_Will',
+            'Horned_Puffin', 'Common_Raven', 'White_necked_Raven', 'American_Redstart', 'Geococcyx', 'Loggerhead_Shrike',
+            'Great_Grey_Shrike', 'Baird_Sparrow', 'Black_throated_Sparrow', 'Brewer_Sparrow', 'Chipping_Sparrow',
+            'Clay_colored_Sparrow', 'House_Sparrow', 'Field_Sparrow', 'Fox_Sparrow', 'Grasshopper_Sparrow', 'Harris_Sparrow',
+            'Henslow_Sparrow', 'Le_Conte_Sparrow', 'Lincoln_Sparrow', 'Nelson_Sharp_tailed_Sparrow', 'Savannah_Sparrow',
+            'Seaside_Sparrow', 'Song_Sparrow', 'Tree_Sparrow', 'Vesper_Sparrow', 'White_crowned_Sparrow',
+            'White_throated_Sparrow', 'Cape_Glossy_Starling', 'Bank_Swallow', 'Barn_Swallow', 'Cliff_Swallow',
+            'Tree_Swallow', 'Scarlet_Tanager', 'Summer_Tanager', 'Artic_Tern', 'Black_Tern', 'Caspian_Tern',
+            'Common_Tern', 'Elegant_Tern', 'Forsters_Tern', 'Least_Tern', 'Green_tailed_Towhee', 'Brown_Thrasher',
+            'Sage_Thrasher', 'Black_capped_Vireo', 'Blue_headed_Vireo', 'Philadelphia_Vireo', 'Red_eyed_Vireo',
+            'Warbling_Vireo', 'White_eyed_Vireo', 'Yellow_throated_Vireo', 'Bay_breasted_Warbler', 'Black_and_white_Warbler',
+            'Black_throated_Blue_Warbler', 'Blue_winged_Warbler', 'Canada_Warbler', 'Cape_May_Warbler', 'Cerulean_Warbler',
+            'Chestnut_sided_Warbler', 'Golden_winged_Warbler', 'Hooded_Warbler', 'Kentucky_Warbler', 'Magnolia_Warbler',
+            'Mourning_Warbler', 'Myrtle_Warbler', 'Nashville_Warbler', 'Orange_crowned_Warbler', 'Palm_Warbler', 'Pine_Warbler',
+            'Prairie_Warbler', 'Prothonotary_Warbler', 'Swainson_Warbler', 'Tennessee_Warbler', 'Wilson_Warbler',
+            'Worm_eating_Warbler', 'Yellow_Warbler', 'Northern_Waterthrush', 'Louisiana_Waterthrush', 'Bohemian_Waxwing',
+            'Cedar_Waxwing', 'American_Three_toed_Woodpecker', 'Pileated_Woodpecker', 'Red_bellied_Woodpecker',
+            'Red_cockaded_Woodpecker', 'Red_headed_Woodpecker', 'Downy_Woodpecker', 'Bewick_Wren', 'Cactus_Wren',
+            'Carolina_Wren', 'House_Wren', 'Marsh_Wren', 'Rock_Wren', 'Winter_Wren', 'Common_Yellowthroat'
+        ]
+    },
+    'dtd': {
+        'class': ADDTD, 'default_size': 256, 'no_classes': 47, 'oe_only': False,
+        'str_labels': [
+            'banded', 'blotchy', 'braided', 'bubbly', 'bumpy', 'chequered', 'cobwebbed', 'cracked', 'crosshatched',
+            'crystalline', 'dotted', 'fibrous', 'flecked', 'freckled', 'frilly', 'gauzy', 'grid', 'grooved', 'honeycombed',
+            'interlaced', 'knitted', 'lacelike', 'lined', 'marbled', 'matted', 'meshed', 'paisley', 'perforated', 'pitted',
+            'pleated', 'polka-dotted', 'porous', 'potholed', 'scaly', 'smeared', 'spiralled', 'sprinkled', 'stained',
+            'stratified', 'striped', 'studded', 'swirly', 'veined', 'waffled', 'woven', 'wrinkled', 'zigzagged'
+        ]
+    },
+    'mnist': {
+        'class': ADMNIST, 'default_size': 28, 'no_classes': 10, 'oe_only': False,
+        'str_labels': [
+          "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"
+        ]
+    },
+    'emnist': {
+        'class': ADEMNIST, 'default_size': 28, 'no_classes': 26, 'oe_only': False, 'str_labels': list(range(26)),  # ?
+    },
+}
+
 TRAIN_NOMINAL_ID = 0
 TRAIN_OE_ID = 1
 TEST_NOMINAL_ID = 2
@@ -107,11 +230,7 @@ def get_raw_shape(train_transform: Compose, dataset_name: str) -> Tuple[int, int
         else:
             return (3, *t.size)
     else:
-        size = {  # default
-            'cifar10': 32, 'mvtec': 256, 'imagenet': 256, 'mnist': 28, 'emnist': 28,
-            'cifar100': 32, 'imagenet21k': 256, 'tinyimages': 32, 'confetti': 256, 'color': 32,
-            'fmnist': 28, 'cub': 256, 'dtd': 256, 'imagenet21ksubset': 256,
-        }[dataset_name]
+        size = DS_CHOICES[dataset_name]['default_size']
         return 3, size, size
 
 
@@ -173,8 +292,11 @@ def load_dataset(dataset_name: str, data_path: str, normal_classes: List[int], n
                 for msm in msms if msm.ds_part in (TEST_NOMINAL_ID, TEST_ANOMALOUS_ID)
             ])
             limit = np.infty
+            kwargs = {}
         else:  # oe case
-            train_classes = sorted(np.random.choice(list(range(no_classes(name))), min(no_classes(name), oe_limit_classes), False))
+            train_classes = sorted(
+                np.random.choice(list(range(no_classes(name))), min(no_classes(name), oe_limit_classes), False)
+            )
             train_label = 1 - nominal_label
             total_train_transform = deepcopy(normal_dataset.train_transform)
             total_test_transform = deepcopy(normal_dataset.test_transform)
@@ -183,39 +305,25 @@ def load_dataset(dataset_name: str, data_path: str, normal_classes: List[int], n
                 (nominal_label, msm.get_transform(), msm.get_transform()) for msm in msms if msm.ds_part == TRAIN_OE_ID
             ])
             test_conditional_transform = None
+            kwargs = {}
+            if isinstance(normal_dataset, ADCustomDS) and name == 'custom':  # special case for custom being used as OE
+                if oe_limit_classes < np.inf:
+                    raise ValueError(
+                        "Using the custom dataset with its own OE part cannot be combined with limiting the OE classes."
+                    )
+                train_classes = normal_classes
+                train_label = nominal_label
+                kwargs = {"oe": True}
         args = (
             data_path, train_classes, train_label, total_train_transform, total_test_transform, raw_shape, logger, limit,
             train_conditional_transform, test_conditional_transform
         )
-        if name == 'cifar10':
-            dataset = ADCIFAR10(*args)
-        elif name == 'imagenet':
-            dataset = ADImageNet(*args)
-        elif name == 'cifar100':
-            dataset = ADCIFAR100(*args)
-        elif name == 'imagenet21k':
-            dataset = ADImageNet21k(*args)
-        elif name == 'imagenetoe':
-            assert normal_dataset is not None, "only usable as OE!"
-            dataset = ADImageNetOE(*args)
-        elif name == 'tinyimages':
-            dataset = ADTinyImages(*args)
-        elif name == 'mvtec':
-            dataset = ADMvTec(*args)
-        elif name == 'fmnist':
-            dataset = ADFMNIST(*args)
-        elif name == 'mnist':
-            dataset = ADMNIST(*args)
-        elif name == 'emnist':
-            dataset = ADEMNIST(*args)
-        elif name == 'cub':
-            dataset = ADCUB(*args)
-        elif name == 'dtd':
-            dataset = ADDTD(*args)
-        elif name == 'imagenet21ksubset':
-            dataset = ADImageNet21kSubSet(*args)
+
+        if DS_CHOICES[name]['oe_only']:
+            assert normal_dataset is not None, f"{name} can only be used as OE!"
+            dataset = DS_CHOICES[name]['class'](*args, **kwargs)
         else:
-            raise NotImplementedError(f'Dataset {name} is unknown (not in {DS_CHOICES})')
+            dataset = DS_CHOICES[name]['class'](*args, **kwargs)
 
         if normal_dataset is not None:  # oe case
             dataset.gpu_train_transform = Compose([normal_dataset.gpu_train_transform, dataset.gpu_train_transform])
@@ -232,110 +340,10 @@ def load_dataset(dataset_name: str, data_path: str, normal_classes: List[int], n
 
 def no_classes(dataset_name: str) -> int:
     """ returns the number of classes for the given dataset """
-    return {
-        'mvtec': 15,
-        'cifar10': 10,
-        'imagenet': 30,
-        'cifar100': 100,
-        'imagenet21k': 21811,
-        'tinyimages': 1,
-        'imagenetoe': 1000,
-        'fmnist': 10,
-        'cub': 200,
-        'dtd': 47,
-        'imagenet21ksubset': 21811,
-        'mnist': 10,
-        'emnist': 26
-    }[dataset_name]
+    return DS_CHOICES[dataset_name]['no_classes']
 
 
 def str_labels(dataset_name) -> List[str]:
     """ returns a list of class descriptions for the given dataset """
-    return {
-        'cifar10': ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck'],
-        'imagenet': deepcopy(ADImageNet.ad_classes),
-        'imagenetoe': list(range(1000)),  # not required
-        'cifar100': [
-            'beaver', 'dolphin', 'otter', 'seal', 'whale',
-            'aquarium_fish', 'flatfish', 'ray', 'shark', 'trout',
-            'orchid', 'poppy', 'rose', 'sunflower', 'tulip',
-            'bottle', 'bowl', 'can', 'cup', 'plate',
-            'apple', 'mushroom', 'orange', 'pear', 'sweet_pepper',
-            'clock', 'keyboard', 'lamp', 'telephone', 'television',
-            'bed', 'chair', 'couch', 'table', 'wardrobe',
-            'bee', 'beetle', 'butterfly', 'caterpillar', 'cockroach',
-            'bear', 'leopard', 'lion', 'tiger', 'wolf',
-            'bridge', 'castle', 'house', 'road', 'skyscraper',
-            'cloud', 'forest', 'mountain', 'plain', 'sea',
-            'camel', 'cattle', 'chimpanzee', 'elephant', 'kangaroo',
-            'fox', 'porcupine', 'possum', 'raccoon', 'skunk',
-            'crab', 'lobster', 'snail', 'spider', 'worm',
-            'baby', 'boy', 'girl', 'man', 'woman',
-            'crocodile', 'dinosaur', 'lizard', 'snake', 'turtle',
-            'hamster', 'mouse', 'rabbit', 'shrew', 'squirrel',
-            'maple_tree', 'oak_tree', 'palm_tree', 'pine_tree', 'willow_tree',
-            'bicycle', 'bus', 'motorcycle', 'pickup_truck', 'train',
-            'lawn_mower', 'rocket', 'streetcar', 'tank', 'tractor'
-        ],
-        'imagenet21k': [str(i) for i in range(21811)],  # ?
-        'imagenet21ksubset': [str(i) for i in range(21811)],  # ?
-        'tinyimages': ['image'],
-        'mvtec': [
-            'bottle', 'cable', 'capsule', 'carpet', 'grid', 'hazelnut', 'leather',
-            'metal_nut', 'pill', 'screw', 'tile', 'toothbrush', 'transistor',
-            'wood', 'zipper'
-        ],
-        'fmnist': [
-            'top', 'trouser', 'pullover', 'dress', 'coat', 'sandal', 'shirt', 'sneaker', 'bag', 'ankle_boot'
-        ],
-        'cub': [
-            'Black_footed_Albatross', 'Laysan_Albatross', 'Sooty_Albatross', 'Groove_billed_Ani', 'Crested_Auklet',
-            'Least_Auklet', 'Parakeet_Auklet', 'Rhinoceros_Auklet', 'Brewer_Blackbird', 'Red_winged_Blackbird',
-            'Rusty_Blackbird', 'Yellow_headed_Blackbird', 'Bobolink', 'Indigo_Bunting', 'Lazuli_Bunting', 'Painted_Bunting',
-            'Cardinal', 'Spotted_Catbird', 'Gray_Catbird', 'Yellow_breasted_Chat', 'Eastern_Towhee', 'Chuck_will_Widow',
-            'Brandt_Cormorant', 'Red_faced_Cormorant', 'Pelagic_Cormorant', 'Bronzed_Cowbird', 'Shiny_Cowbird', 'Brown_Creeper',
-            'American_Crow', 'Fish_Crow', 'Black_billed_Cuckoo', 'Mangrove_Cuckoo', 'Yellow_billed_Cuckoo',
-            'Gray_crowned_Rosy_Finch', 'Purple_Finch', 'Northern_Flicker', 'Acadian_Flycatcher', 'Great_Crested_Flycatcher',
-            'Least_Flycatcher', 'Olive_sided_Flycatcher', 'Scissor_tailed_Flycatcher', 'Vermilion_Flycatcher',
-            'Yellow_bellied_Flycatcher', 'Frigatebird', 'Northern_Fulmar', 'Gadwall', 'American_Goldfinch',
-            'European_Goldfinch', 'Boat_tailed_Grackle', 'Eared_Grebe', 'Horned_Grebe', 'Pied_billed_Grebe', 'Western_Grebe',
-            'Blue_Grosbeak', 'Evening_Grosbeak', 'Pine_Grosbeak', 'Rose_breasted_Grosbeak', 'Pigeon_Guillemot',
-            'California_Gull', 'Glaucous_winged_Gull', 'Heermann_Gull', 'Herring_Gull', 'Ivory_Gull', 'Ring_billed_Gull',
-            'Slaty_backed_Gull', 'Western_Gull', 'Anna_Hummingbird', 'Ruby_throated_Hummingbird', 'Rufous_Hummingbird',
-            'Green_Violetear', 'Long_tailed_Jaeger', 'Pomarine_Jaeger', 'Blue_Jay', 'Florida_Jay', 'Green_Jay',
-            'Dark_eyed_Junco', 'Tropical_Kingbird', 'Gray_Kingbird', 'Belted_Kingfisher', 'Green_Kingfisher', 'Pied_Kingfisher',
-            'Ringed_Kingfisher', 'White_breasted_Kingfisher', 'Red_legged_Kittiwake', 'Horned_Lark', 'Pacific_Loon', 'Mallard',
-            'Western_Meadowlark', 'Hooded_Merganser', 'Red_breasted_Merganser', 'Mockingbird', 'Nighthawk', 'Clark_Nutcracker',
-            'White_breasted_Nuthatch', 'Baltimore_Oriole', 'Hooded_Oriole', 'Orchard_Oriole', 'Scott_Oriole', 'Ovenbird',
-            'Brown_Pelican', 'White_Pelican', 'Western_Wood_Pewee', 'Sayornis', 'American_Pipit', 'Whip_poor_Will',
-            'Horned_Puffin', 'Common_Raven', 'White_necked_Raven', 'American_Redstart', 'Geococcyx', 'Loggerhead_Shrike',
-            'Great_Grey_Shrike', 'Baird_Sparrow', 'Black_throated_Sparrow', 'Brewer_Sparrow', 'Chipping_Sparrow',
-            'Clay_colored_Sparrow', 'House_Sparrow', 'Field_Sparrow', 'Fox_Sparrow', 'Grasshopper_Sparrow', 'Harris_Sparrow',
-            'Henslow_Sparrow', 'Le_Conte_Sparrow', 'Lincoln_Sparrow', 'Nelson_Sharp_tailed_Sparrow', 'Savannah_Sparrow',
-            'Seaside_Sparrow', 'Song_Sparrow', 'Tree_Sparrow', 'Vesper_Sparrow', 'White_crowned_Sparrow',
-            'White_throated_Sparrow', 'Cape_Glossy_Starling', 'Bank_Swallow', 'Barn_Swallow', 'Cliff_Swallow',
-            'Tree_Swallow', 'Scarlet_Tanager', 'Summer_Tanager', 'Artic_Tern', 'Black_Tern', 'Caspian_Tern',
-            'Common_Tern', 'Elegant_Tern', 'Forsters_Tern', 'Least_Tern', 'Green_tailed_Towhee', 'Brown_Thrasher',
-            'Sage_Thrasher', 'Black_capped_Vireo', 'Blue_headed_Vireo', 'Philadelphia_Vireo', 'Red_eyed_Vireo',
-            'Warbling_Vireo', 'White_eyed_Vireo', 'Yellow_throated_Vireo', 'Bay_breasted_Warbler', 'Black_and_white_Warbler',
-            'Black_throated_Blue_Warbler', 'Blue_winged_Warbler', 'Canada_Warbler', 'Cape_May_Warbler', 'Cerulean_Warbler',
-            'Chestnut_sided_Warbler', 'Golden_winged_Warbler', 'Hooded_Warbler', 'Kentucky_Warbler', 'Magnolia_Warbler',
-            'Mourning_Warbler', 'Myrtle_Warbler', 'Nashville_Warbler', 'Orange_crowned_Warbler', 'Palm_Warbler', 'Pine_Warbler',
-            'Prairie_Warbler', 'Prothonotary_Warbler', 'Swainson_Warbler', 'Tennessee_Warbler', 'Wilson_Warbler',
-            'Worm_eating_Warbler', 'Yellow_Warbler', 'Northern_Waterthrush', 'Louisiana_Waterthrush', 'Bohemian_Waxwing',
-            'Cedar_Waxwing', 'American_Three_toed_Woodpecker', 'Pileated_Woodpecker', 'Red_bellied_Woodpecker',
-            'Red_cockaded_Woodpecker', 'Red_headed_Woodpecker', 'Downy_Woodpecker', 'Bewick_Wren', 'Cactus_Wren',
-            'Carolina_Wren', 'House_Wren', 'Marsh_Wren', 'Rock_Wren', 'Winter_Wren', 'Common_Yellowthroat'
-        ],
-        'dtd': [
-            'banded', 'blotchy', 'braided', 'bubbly', 'bumpy', 'chequered', 'cobwebbed', 'cracked', 'crosshatched',
-            'crystalline', 'dotted', 'fibrous', 'flecked', 'freckled', 'frilly', 'gauzy', 'grid', 'grooved', 'honeycombed',
-            'interlaced', 'knitted', 'lacelike', 'lined', 'marbled', 'matted', 'meshed', 'paisley', 'perforated', 'pitted',
-            'pleated', 'polka-dotted', 'porous', 'potholed', 'scaly', 'smeared', 'spiralled', 'sprinkled', 'stained',
-            'stratified', 'striped', 'studded', 'swirly', 'veined', 'waffled', 'woven', 'wrinkled', 'zigzagged'
-        ],
-        'mnist': [
-          "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"
-        ],
-        'emnist': list(range(26))  # ?
-    }[dataset_name]
+    return DS_CHOICES[dataset_name]['str_labels']
+
