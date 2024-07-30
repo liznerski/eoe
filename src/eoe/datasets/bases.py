@@ -221,7 +221,7 @@ class TorchvisionDataset(BaseADDataset):
         train_loader = DataLoader(
             dataset=self.train_set, batch_size=batch_size, num_workers=num_workers, pin_memory=False,
             persistent_workers=persistent, prefetch_factor=prefetch_factor,
-            sampler=RandomSampler(self.train_set, replacement=replacement) if shuffle_train else None
+            sampler=RandomSampler(self.train_set, replacement=replacement) if shuffle_train else None,
         )
         test_loader = DataLoader(
             dataset=self.test_set, batch_size=batch_size, num_workers=num_workers, pin_memory=False,

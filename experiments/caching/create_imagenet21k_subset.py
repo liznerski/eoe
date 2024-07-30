@@ -59,7 +59,9 @@ try:
         os.makedirs(pt.join(dst, cls, ))
         for img_path in img_paths:
             try:
-                img = resize(ds.loader(img_path))
+                img = ds.loader(img_path)
+                if min(img.size) > args.resize:
+                    img = resize(img)
             except UnidentifiedImageError as e:
                 print('Skipping {}. ImageNet22k could not load picture. Unidentified image error.'.format(img_path),
                       file=sys.stderr)

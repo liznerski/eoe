@@ -411,11 +411,13 @@ class ADTrainer(ABC):
                     # ---- compute loss and optimize
                     opt.zero_grad()
                     image_features = model(imgs)
-                    loss = self.loss(image_features, lbls, center, inputs=imgs)
+                    loss = self.loss(image_features, lbls, center, inputs=imgs, nominal_label=ds.nominal_label)
                     loss.backward()
                     opt.step()
                     opt.zero_grad()
-                    anomaly_scores = self.compute_anomaly_score(image_features, center, inputs=imgs).cpu()
+                    anomaly_scores = self.compute_anomaly_score(
+                        image_features, center, inputs=imgs, nominal_label=ds.nominal_label
+                    ).cpu()
 
                     # ---- log stuff
                     ep_labels.append(lbls.detach().cpu())
@@ -487,7 +489,7 @@ class ADTrainer(ABC):
                 imgs = ds.gpu_test_transform(imgs)
             with torch.no_grad():
                 image_features = model(imgs)
-            anomaly_scores = self.compute_anomaly_score(image_features, center, inputs=imgs)
+            anomaly_scores = self.compute_anomaly_score(image_features, center, inputs=imgs, nominal_label=ds.nominal_label)
             ep_labels.append(lbls.cpu())
             ep_ascores.append(anomaly_scores.cpu())
             procbar.update()

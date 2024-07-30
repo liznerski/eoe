@@ -29,7 +29,8 @@ class FocalTrainer(ADTrainer):
         return None
 
     def compute_anomaly_score(self, features: torch.Tensor, center: torch.Tensor, train: bool = False, **kwargs) -> torch.Tensor:
-        return sigmoid(features).squeeze()
+        scores = sigmoid(features).squeeze()
+        return scores if kwargs.get("nominal_label", 0) == 0 else (1 - scores)
 
     def loss(self, features: torch.Tensor, labels: torch.Tensor, center: torch.Tensor, **kwargs) -> torch.Tensor:
         return FocalLoss()(features.squeeze(), labels.float())

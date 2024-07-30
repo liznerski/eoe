@@ -80,20 +80,22 @@ class ADClipTrainer(ADTrainer):
 
     def loss(self, image_features: torch.Tensor, labels: torch.Tensor, center: torch.Tensor, **kwargs) -> torch.Tensor:
         text_features = center
+        nominal_label = kwargs.get("nominal_label", 0)
+        anom_label = 1 - nominal_label
         image_features = image_features / image_features.norm(dim=-1, keepdim=True)
         similarity = (100.0 * image_features @ text_features.T).log_softmax(dim=-1)
         if self.ad_mode == 'one_vs_rest':
-            aloss = similarity[labels == 1][:, -1]
-            nloss = similarity[labels == 0][:, 0]
+            aloss = similarity[labels == anom_label][:, -1]
+            nloss = similarity[labels == nominal_label][:, 0]
             loss = torch.zeros_like(similarity[:, 0])
-            loss[labels == 1] = aloss
-            loss[labels == 0] = nloss
+            loss[labels == anom_label] = aloss
+            loss[labels == nominal_label] = nloss
         elif self.ad_mode == 'leave_one_out':
-            aloss = similarity[labels == 1][:, -1]
-            nloss = similarity[labels == 0][:, :-1].max(-1)[0]
+            aloss = similarity[labels == anom_label][:, -1]
+            nloss = similarity[labels == nominal_label][:, :-1].max(-1)[0]
             loss = torch.zeros_like(similarity[:, 0])
-            loss[labels == 1] = aloss
-            loss[labels == 0] = nloss
+            loss[labels == anom_label] = aloss
+            loss[labels == nominal_label] = nloss
         else:
             raise NotImplementedError()
         loss = loss.mul(-1)
