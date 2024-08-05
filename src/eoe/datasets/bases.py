@@ -218,15 +218,22 @@ class TorchvisionDataset(BaseADDataset):
         @return: A tuple (train_loader, test_loader).
         """
         # classes = None means all classes
+        prefetch_factor = prefetch_factor if num_workers > 0 else None
+        train_sampler = RandomSampler(
+            self.train_set, replacement=replacement
+        ) if shuffle_train and self.train_set is not None else None
         train_loader = DataLoader(
             dataset=self.train_set, batch_size=batch_size, num_workers=num_workers, pin_memory=False,
             persistent_workers=persistent, prefetch_factor=prefetch_factor,
-            sampler=RandomSampler(self.train_set, replacement=replacement) if shuffle_train else None,
+            sampler=train_sampler,
         )
+        test_sampler = RandomSampler(
+            self.test_set, replacement=replacement
+        ) if shuffle_test and self.test_set is not None else None
         test_loader = DataLoader(
             dataset=self.test_set, batch_size=batch_size, num_workers=num_workers, pin_memory=False,
             persistent_workers=persistent, prefetch_factor=prefetch_factor,
-            sampler=RandomSampler(self.test_set, replacement=replacement) if shuffle_test else None
+            sampler=test_sampler
         )
         return train_loader, test_loader
 
@@ -307,6 +314,14 @@ class TorchvisionDataset(BaseADDataset):
                         self.logger.print(f'Use cached mean/std of training dataset with normal classes {self.normal_classes}')
                         mean, std = self.load_cached_stats(NORM_MODES[strs[0]])
                     else:
+                        if train_dataset is None:
+                            raise ValueError(
+                                "Simply putting 'normalize' in the validation transforms doesn't work, as the normalization "
+                                "statistics (mean, std) need to be computed using the unspecified training set. "
+                                "Either manually define a transforms.Normalize(...) in the code instead or copy the "
+                                "automatically created stats_cache.json file over from the training dataset "
+                                "folder to the test dataset folder."
+                            )
                         loader = DataLoader(dataset=train_dataset, batch_size=2, shuffle=False, num_workers=4, pin_memory=True, )
                         acc = RunningStats()
                         desc = f'Extracting mean/std of training dataset with normal classes {self.normal_classes}'
@@ -316,6 +331,12 @@ class TorchvisionDataset(BaseADDataset):
                         self.cache_stats(mean, std, NORM_MODES[strs[0]])
                     norm = transforms.Normalize(mean, std, inplace=False)
                 else:
+                    if train_dataset is None:
+                        raise ValueError(
+                            "Simply putting 'normalize' in the validation transforms doesn't work, as the normalization "
+                            "statistics (max, min) need to be computed using the unspecified training set. "
+                            "Manually define a transforms.Normalize(...) in the code instead."
+                        )
                     loader = DataLoader(dataset=train_dataset, batch_size=2, shuffle=False, num_workers=4, pin_memory=True)
                     all_x = []
                     for x, _, _ in tqdm(loader, desc='Extracting max and min of GCN normalized training dataset'):
@@ -508,6 +529,8 @@ class CombinedDataset(TorchvisionDataset):
         For a description of the parameters see :method:`eoe.datasets.bases.TorchvisionDataset.loaders`.
         @return: a tuple of (train_loader, test_loader)
         """
+        if num_workers == 0:
+            prefetch_factor = None
         # classes = None means all classes
         normal_train_loader, test_loader = self.normal.loaders(
             batch_size, shuffle_train, shuffle_test, False, num_workers, persistent, prefetch_factor

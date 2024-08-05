@@ -21,7 +21,7 @@ with open(pt.join(PACKAGE_DIR, 'requirements.txt')) as f:
 
 setup(
     name='eoe',
-    version='0.1',
+    version='0.2',
     classifiers=[
         'Development Status :: 4 - Alpha',
         'Intended Audience :: Science/Research',

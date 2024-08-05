@@ -288,7 +288,7 @@ def create_trainer(trainer: str, comment: str, dataset: str, oe_dataset: str, ep
     `eoe/data` and creates a logger for the trainer. Returns the created trainer.
     For a description of the parameters have a look at :class:`eoe.training.ad_trainer.ADTrainer`.
     """
-    datapath = pt.abspath(pt.join(__file__, '..', '..', '..', '..', 'data'))
+    datapath = kwargs.pop('dataset_path', pt.abspath(pt.join(__file__, '..', '..', '..', '..', 'data')))
     kwargs = dict(kwargs)
     superdir = kwargs.pop('superdir', '.')
     continue_run = kwargs.pop('continue_run', None)
@@ -299,12 +299,18 @@ def create_trainer(trainer: str, comment: str, dataset: str, oe_dataset: str, ep
         logger = Logger(continue_run + '---CNTD', noname=True)
 
     if dataset == 'custom' or oe_dataset == 'custom':
-        cstm_classes = ADCustomDS.determine_classes(pt.join(datapath, 'datasets'))
+        if ADCustomDS.train_only or ADCustomDS.eval_only:
+            cstm_classes = ADCustomDS.determine_classes(datapath)
+        else:
+            datapath = pt.join(datapath, 'datasets')
+            cstm_classes = ADCustomDS.determine_classes(datapath)
         IMG_DS_CHOICES['custom']['str_labels'] = cstm_classes
         IMG_DS_CHOICES['custom']['no_classes'] = len(cstm_classes)
+    else:
+        datapath = pt.join(datapath, 'datasets')
 
     trainer = TRAINER[trainer](
-        model, train_transform, val_transform, dataset, oe_dataset, pt.join(datapath, 'datasets'), logger,
+        model, train_transform, val_transform, dataset, oe_dataset, datapath, logger,
         epochs, lr, wdk, milestones, batch_size, ad_mode, torch.device(gpus[0]),
         oe_limit_samples, oe_limit_classes, msm, **kwargs
     )

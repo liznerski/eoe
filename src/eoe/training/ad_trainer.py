@@ -2,6 +2,7 @@ from abc import abstractmethod, ABC
 from copy import deepcopy
 from typing import Union, List, Tuple, Generic, TypeVar
 
+import os
 import numpy as np
 import torch
 from sklearn.metrics import auc as compute_auc, roc_curve, precision_recall_curve, average_precision_score
@@ -11,10 +12,11 @@ from torch.utils.data.dataloader import DataLoader
 from torchvision.transforms import Compose
 from tqdm import tqdm
 
-from eoe.datasets import load_dataset, str_labels, no_classes, MSM
+from eoe.datasets import load_dataset, str_labels, no_classes, MSM, ADCustomDS
 from eoe.datasets.bases import TorchvisionDataset, CombinedDataset
 from eoe.datasets.imagenet import ADImageNet21k
 from eoe.models.clip_official.clip.model import CLIP
+from eoe.models.custom_base import CustomNet
 from eoe.utils.logger import Logger, ROC, PRC
 
 
@@ -173,7 +175,8 @@ class ADTrainer(ABC):
             raise NotImplementedError(f'AD mode {self.ad_mode} unknown. Known modes are {ADTrainer.AD_MODES}.')
 
     def run(self, run_classes: List[int] = None, run_seeds: int = 1,
-            load: List[List[Union[Module, str]]] = None) -> Tuple[List[List[Module]], dict]:
+            load: List[List[Union[Module, str]]] = None, test: bool = True,
+            train: bool = True) -> Tuple[List[List[Module]], dict]:
         """
         Iterates over all classes and multiple random seeds per class.
         For each class-seed combination, it trains and evaluates a given AD model using the trainer's loss
@@ -191,6 +194,8 @@ class ADTrainer(ABC):
             The model snapshots need to match the model architecture specified in the initialization of the trainer.
             If the snapshots are dictionaries, the trainer just continues training at the stored last epoch and, if the number
             of overall epochs has been reached already, just evaluates the model.
+        @param test: whether to evaluate on the test set after having completed training.
+        @param test: whether to actually train the model before evaluating.
         @return: returns a tuple of
             - a list (len = #classes) with each element again being a list (len = #seeds) of trained AD models.
               If ADTrainer.KEEP_SNAPSHOT_IN_RAM is False, this list will be None to prevent out-of-memory errors.
@@ -198,7 +203,9 @@ class ADTrainer(ABC):
               evaluation.
             All the returned information is always also stored on the disk using the trainer's logger.
         """
-        self.logger.logsetup(None, None, {'run_classes': run_classes, 'run_seeds': run_seeds, 'load': load}, step=1)
+        self.logger.logsetup(
+            None, None, {'run_classes': run_classes, 'run_seeds': run_seeds, 'load': load}, step=1
+        )
 
         """ trains and evaluates cls-wise """
         # prepare variables
@@ -249,7 +256,10 @@ class ADTrainer(ABC):
                 for i in range(5):
                     try:
                         model = copy_model()
-                        model, roc = self.train_cls(model, ds, c, cstr, seed, cur_load)
+                        if train:
+                            model, roc = self.train_cls(model, ds, c, cstr, seed, cur_load)
+                        else:
+                            roc = None
                         break
                     except NanGradientsError as err:  # try once more
                         self.logger.warning(
@@ -273,9 +283,9 @@ class ADTrainer(ABC):
                     train_cls_rocs.means(True), classes, name='training_intermediate_roc', step=c*run_seeds+seed
                 )
 
-                # eval 
+                # eval
                 model = models[c][-1]
-                if model is not None:
+                if test and model is not None:
                     roc, prc = self.eval_cls(model, ds, c, cstr, seed)
                 else:
                     roc, prc = None, None
@@ -471,13 +481,13 @@ class ADTrainer(ABC):
             prev = ds.preview(20, False)
             stats = ds.n_normal_anomalous(False)
             self.logger.logimg(
-                f'eval_cls{cls}-{clsstr}_preview', prev, nrow=prev.shape[0] // 2,
-                rowheaders=[str(stats[0]), str(stats[1])]
+                f'eval_cls{cls}-{clsstr}_preview', prev, nrow=prev.shape[0] // len(stats),
+                rowheaders=[f"{k}: {v}" for k, v in sorted(stats.items())]
             )
             del prev
 
         center = self.center
-        ep_labels, ep_ascores = [], []  # [...], list of all labels/etc.
+        ep_labels, ep_ascores, ep_idcs = [], [], []  # [...], list of all labels/etc.
         procbar = tqdm(desc=f'evaluating cls {clsstr}', total=len(loader))
         for imgs, lbls, idcs in loader:
             imgs = imgs.to(self.device)
@@ -492,17 +502,32 @@ class ADTrainer(ABC):
             anomaly_scores = self.compute_anomaly_score(image_features, center, inputs=imgs, nominal_label=ds.nominal_label)
             ep_labels.append(lbls.cpu())
             ep_ascores.append(anomaly_scores.cpu())
+            ep_idcs.append(idcs.cpu())
             procbar.update()
         procbar.close()
-        ep_labels, ep_ascores = torch.cat(ep_labels), torch.cat(ep_ascores)
+        ep_labels, ep_ascores, ep_idcs = torch.cat(ep_labels), torch.cat(ep_ascores), torch.cat(ep_idcs)
 
-        fpr, tpr, thresholds = roc_curve(ep_labels, ep_ascores.squeeze())
-        auc = compute_auc(fpr, tpr)
-        cls_roc = ROC(tpr, fpr, thresholds, auc)
+        if len(ep_labels[ep_labels == 0]) > 0 and len(ep_labels[ep_labels == 1]) > 0:
+            fpr, tpr, thresholds = roc_curve(ep_labels[ep_labels >= 0], ep_ascores[ep_labels >= 0].squeeze())
+            auc = compute_auc(fpr, tpr)
+            cls_roc = ROC(tpr, fpr, thresholds, auc)
+            prec, rec, thresholds = precision_recall_curve(ep_labels[ep_labels >= 0], ep_ascores[ep_labels >= 0].squeeze())
+            average_prec = average_precision_score(ep_labels[ep_labels >= 0], ep_ascores[ep_labels >= 0].squeeze())
+            cls_prc = PRC(prec, rec, thresholds, average_prec)
+        else:
+            auc = None
+            cls_roc = None
+            average_prec = None
+            cls_prc = None
 
-        prec, rec, thresholds = precision_recall_curve(ep_labels, ep_ascores.squeeze())
-        average_prec = average_precision_score(ep_labels, ep_ascores.squeeze())
-        cls_prc = PRC(prec, rec, thresholds, average_prec)
+        if isinstance(ds, ADCustomDS):
+            tds = ds.test_set
+            ascore_dict = {
+                tds.dataset.samples[tds.indices[k.item()]][0].replace(tds.dataset.root + os.sep, ""): v.item()
+                for k, v in zip(ep_idcs, ep_ascores)
+            }
+        else:
+            ascore_dict = {ds.test_set.indices[k.item()]: v.item() for k, v in zip(ep_idcs, ep_ascores)}
 
         self.logger.logtxt(
             f'Eval: class "{clsstr}" yields {auc * 100:04.2f}% AUC and {average_prec * 100:04.2f}% average precision (seed {seed}).'
@@ -513,6 +538,7 @@ class ADTrainer(ABC):
         self.logger.tb_writer.add_histogram(
             f'Eval: (SD{seed}) anomaly_scores cls{cls} anomalous', ep_ascores[ep_labels == 1], 0, walltime=0
         )
+        self.logger.logjson(f'eval_cls{cls}_it{seed}_anomaly_scores', ascore_dict)
         model.cpu()
 
         return cls_roc, cls_prc
@@ -530,7 +556,21 @@ class ADTrainer(ABC):
         """
         epoch = 0
         if path is not None:
-            snapshot = torch.load(path)
+            snapshot = self.unify_snapshot_style(torch.load(path))
+
+            # CustomNets
+            feature_model_state = snapshot.pop('feature_model', None)
+            if feature_model_state is not None:
+                if not isinstance(model, CustomNet):
+                    raise ValueError(
+                        f"Found weights for a pre-trained feature model of a CustomNet at {path}. "
+                        f"However, the AD model ({model.__class__}) is not a CustomNet! "
+                        f"Please use a different snapshot or a custom model."
+                    )
+                model.load_feature_model_weights(feature_model_state)
+                self.logger.print(f'Loaded pre-trained weights for feature model of CustomNet.')
+
+            # EOE models
             net_state = snapshot.pop('net', None)
             opt_state = snapshot.pop('opt', None)
             sched_state = snapshot.pop('sched', None)
@@ -541,8 +581,25 @@ class ADTrainer(ABC):
                 opt.load_state_dict(opt_state)
             if sched_state is not None and sched is not None:
                 sched.load_state_dict(sched_state)
-            self.logger.print(f'Loaded snapshot at epoch {epoch}')
+            if any([net_state is not None, opt_state is not None, sched_state is not None]):
+                self.logger.print(f'Loaded snapshot at epoch {epoch}')
+
+        if hasattr(model, 'freeze_parts'):
+            frozen = model.freeze_parts()
+            if frozen:
+                self.logger.print(f'Froze gradients for parts of the AD model.')
+
         return epoch
+
+    def unify_snapshot_style(self, snapshot: dict) -> dict:
+        if "net" in snapshot and isinstance(snapshot['net'], dict):  # EOE style
+            return snapshot
+        else:
+            if all([isinstance(t, torch.Tensor) for t in snapshot.values()]):
+                # seems to be a snapshot purely of model weights, assume this to be a feature module of a CustomNet
+                return {'feature_model': snapshot}
+            else:
+                raise ValueError("Cannot parse snapshot.")
 
     def load_epochs_only(self, path: str):
         """ loads the last epoch with which the snapshot's model found at `path` was trained """

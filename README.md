@@ -66,15 +66,6 @@ We recommend to use a virtual environment (via **virtualenv** or **conda**) to i
     conda activate eoe
     python -m pip install -e eoe/src
 
-**CUDA 11**:
-
-If your system uses CUDA 11, you need to install a different PyTorch version that is compatible with CUDA 11. 
-For this, you can instead execute:
-
-    virtualenv -p python3 eoe/data/venv 
-    source eoe/data/venv/bin/activate
-    bash eoe/src/pip_install_cuda11.sh
-
 **Datasets**:
 
 Apart from ImageNet-30, ImageNet-22K, and 80MTI images, all datasets are automatically downloaded once requested. 
@@ -195,6 +186,8 @@ You can find a precise enumeration below.
     ├── ...
     ├── eval_cls{i}-{clsname}_roc.pdf       # test receiver-operator-characteristic of cls {i} with a plot for each random seedd and the legend showing the AUC
     ├── ...
+    ├── eval_cls{i}_it{j}.json              # dictionary of test sample indices to anomaly scores for cls {i} and the {j}-th random seed
+    ├── ...
     ├── eval_prc.pdf                        # test precision-recall curve over all classes
     ├── eval_roc.pdf                        # test receiver-operator-characteristic over all classes
     ├── logtxt.txt                          # contains all computed metrics in the form of human-readable text 
@@ -255,7 +248,9 @@ There is also a tensorboard logfile that contains most of the logged data.
 
 ## Custom datasets
 
-We also support custom datasets.
+We also support training with custom datasets and models.
+
+### Default EOE training with custom datasets
 Please use either `eoe/src/eoe/main/train_custom.py` or `eoe/src/eoe/main/evolve_oe_custom.py` for custom data.
 The code looks for the data in `eoe/data/datasets/custom/` and expects the folder to be of the form specified in (1), which follows the
 one-vs-rest approach, or of the form specified in (2), which follows the general AD approach.
@@ -290,6 +285,30 @@ For (2):
 The same holds for the test set, where "/train/" has to be replaced by "/test/", and in (2) the anomalies are not 
 used as OE but as ground-truth anomalies for testing.
 
+### Separate training and inference with custom models and data
+For full customizability, we provide separate scripts for training and inference with custom models and data.
 
-## Need help?
+Use `eoe/src/eoe/main/train_only_custom.py` for training. 
+This script defines additional arguments:
+* **--custom-dataset-path**: A path to the custom dataset's training data directory. The directory has to contain a folder named 'normal' for normal training samples. Additionally, it can contain a folder named 'anomalous' for anomalous training samples, which are used if **-oe** is set to "custom". Both these folder have to contain images only.
+* **--log-path**: A path to a directory where results are to be logged (see [Log Data](#log-data)).
+* **--custom-model-name**: The class name of any model implemented in `xad.models.custom`.
+* [**--custom-model-snapshot**, optional]: The snapshot can either be: (1) A state_dict of the feature model specified with --custom-model-name. In this case, the feature model gets initialized with those weights. (2) a snapshot that is automatically logged via previous EOE experiments. In this case, the states of the model, optimizer, scheduler, and epoch are loaded. EOE continues training.
+* [**--custom-model-add-prediction-head**, optional]: Adds a randomly-initialized prediction head with either 256 output neurons (HSC, ...) or 1 neuron (BCE, focal, ...) to the model.
+* [**--custom-model-freeze**, optional]: Freezes gradients for a part of the model, depending on the implementation of the model's *self.freeze_parts()* method. Per default, if argument is set, freezes the entire feature extraction module.
+
+For inference, use `eoe/src/eoe/main/inference_custom.py`. Similar to training, the script defines additional arguments:
+* **--custom-dataset-path**: A path to the custom dataset's test data directory. The directory has to contain at least one of the following folders: (1) 'normal' for normal test samples, (2) 'anomalous' for anomalous test samples, and (3) 'unlabeled' for unlabeled test samples. One of these folders needs to be non-empty. If both (1) and (2) contain each at least one image, an AuROC will be computed for (1) vs (2). All folders have to contain images only.
+* **--log-path**: A path to a directory where results are to be logged (see [Log Data](#log-data)).
+* **--custom-model-snapshot**: The path to a snapshot that was automatically logged via previous EOE experiments. 
+* **--custom-model-name**: The class name of any model implemented in `xad.models.custom`.
+* [**--custom-model-add-prediction-head**, optional]: Adds a randomly-initialized prediction head with either 256 output neurons (HSC, ...) or 1 neuron (BCE, focal, ...) to the model.
+
+All models that are in the package `xad.models.custom` and inherit `xad.models.custom_base.CustomNet` become available for training and inference.
+Per default, any CustomNet extracts features using its *self.feature_model* module---which needs to be set for any CustomNet---passes those through a prediction head if **--custom-model-add-prediction-head** is True, and returns the outcome.
+
+You can manually redefine the data transformation pipeline.
+The default one for training resizes all images to 256x256, applies mild random color jitter, random horizontal flips, random crop to 224x224, transfroms the images to PyTorch tensors, and standardizes the data with an automatically extracted mean and std of the training data. Note that for the latter, the code caches the dataset statsistics in a file `stats_cache.json` in the dataset folder. If you change the dataset, please remove this cache file.  
+
+# Need help?
 If you find any bugs, have questions, need help modifying EOE, or want to get in touch in general, feel free to write us an [email](mailto:liznerski@cs.uni-kl.de)!
