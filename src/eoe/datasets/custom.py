@@ -1,7 +1,7 @@
 import os
 import os.path as pt
 from collections import Counter
-from typing import List, Tuple, Callable, Union
+from typing import List, Tuple, Callable, Union, Dict
 
 import numpy as np
 import torch
@@ -28,7 +28,7 @@ class ADCustomDS(TorchvisionDataset):
                  train_transform: transforms.Compose, test_transform: transforms.Compose,
                  raw_shape: Tuple[int, int, int], logger: Logger = None, limit_samples: Union[int, List[int]] = np.infty,
                  train_conditional_transform: ConditionalCompose = None, test_conditional_transform: ConditionalCompose = None,
-                 oe=False):
+                 oe=False, ds_statistics: Dict = None, ):
         """
         AD dataset for custom image folder datasets.
         For combined training and evaluation (see :file:`main/train_custom.py`),
@@ -96,7 +96,8 @@ class ADCustomDS(TorchvisionDataset):
         root = pt.join(root, self.base_folder)
         super().__init__(
             root, normal_classes, nominal_label, train_transform, test_transform, len(ADCustomDS.classes),
-            raw_shape, logger, limit_samples, train_conditional_transform, test_conditional_transform
+            raw_shape, logger, limit_samples, train_conditional_transform, test_conditional_transform,
+            ds_statistics=ds_statistics
         )
         self.check_data()
         if self.ovr and oe:
@@ -194,6 +195,9 @@ class ADCustomDS(TorchvisionDataset):
             )
         else:
             return None
+        
+    def _update_transforms(self, train_dataset: torch.utils.data.Dataset, cache: bool = False, load: Dict = None):
+        return super()._update_transforms(train_dataset, cache, load=load)
 
     def n_normal_anomalous(self, train=True) -> dict:
         """

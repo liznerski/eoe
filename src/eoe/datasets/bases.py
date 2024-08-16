@@ -3,7 +3,7 @@ import os.path as pt
 from abc import ABC, abstractmethod
 from collections import Counter
 from copy import deepcopy
-from typing import Tuple, List, Union
+from typing import Tuple, List, Union, Dict
 
 import numpy as np
 import torch
@@ -80,7 +80,8 @@ class TorchvisionDataset(BaseADDataset):
     def __init__(self, root: str, normal_classes: List[int], nominal_label: int, train_transform: Compose,
                  test_transform: Compose, classes: int, raw_shape: Tuple[int, int, int],
                  logger: Logger = None, limit_samples: Union[int, List[int]] = np.infty,
-                 train_conditional_transform: ConditionalCompose = None, test_conditional_transform: ConditionalCompose = None):
+                 train_conditional_transform: ConditionalCompose = None, test_conditional_transform: ConditionalCompose = None,
+                 ds_statistics: Dict = None, ):
         """
         An implementation of a Torchvision-style AD dataset. It provides a data loader for its train and test split each.
         There is a :method:`preview` that returns a collection of random batches of image samples from the loaders.
@@ -146,9 +147,10 @@ class TorchvisionDataset(BaseADDataset):
         self.gpu_train_conditional_transform = lambda x, y: x
         self.gpu_test_conditional_transform = lambda x, y: x
 
+        self._ds_statistics = ds_statistics
         self._unpack_transforms()
         if any([isinstance(t, str) for t in (self.train_transform.transforms + self.test_transform.transforms)]):
-            self._update_transforms(self._get_raw_train_set())
+            self._ds_statistics = self._update_transforms(self._get_raw_train_set(), load=ds_statistics)
             self._unpack_transforms()
         self._split_transforms()
 
@@ -159,6 +161,10 @@ class TorchvisionDataset(BaseADDataset):
     @property
     def test_set(self):
         return self._test_set
+
+    @property
+    def ds_statistics(self):
+        return dict(self._ds_statistics) if self._ds_statistics is not None else None
 
     def create_subset(self, dataset_split: VisionDataset, class_labels: List[int], ) -> Subset:
         """
@@ -284,7 +290,7 @@ class TorchvisionDataset(BaseADDataset):
         out = [o[:percls] for o in out]
         return torch.cat(out)
 
-    def _update_transforms(self, train_dataset: torch.utils.data.Dataset):
+    def _update_transforms(self, train_dataset: torch.utils.data.Dataset, cache: bool = True, load: Dict = None) -> Dict:
         """
         Replaces occurrences of the string 'Normalize' (or others, see :attr:`NORM_MODES`) within the train and test transforms
         with an actual `transforms.Normalize`. For this, extracts, e.g., the empirical mean and std of the normal data.
@@ -292,7 +298,11 @@ class TorchvisionDataset(BaseADDataset):
         `transforms.Normalize`. For instance, GCN uses a max/min normalization, which can also be accomplished with
         `transforms.Normalize`.
         @param train_dataset: some raw training split of a dataset. In this context, raw means no data augmentation.
+        @param cache: whether to store/load the statistics as a json file in the dataset folder.
+        @param load: when given, use the statistics provided from a model snapshot. Has priority over param cache.
+        @return: used statistics
         """
+        statistics = None
         if any([isinstance(t, str) for t in (self.train_transform.transforms + self.test_transform.transforms)]):
             train_str_pos, train_str = list(
                 zip(*[(i, t.lower()) for i, t in enumerate(self.train_transform.transforms) if isinstance(t, str)])
@@ -310,9 +320,13 @@ class TorchvisionDataset(BaseADDataset):
                 if not all([NORM_MODES[strs[i]] == NORM_MODES[strs[j]] for i in range(len(strs)) for j in range(i)]):
                     raise ValueError(f'Transforms contain different norm modes, which is not supported. ')
                 if NORM_MODES[strs[0]] == STD_NORM:
-                    if self.load_cached_stats(NORM_MODES[strs[0]]) is not None:
+                    if load is None and cache and self.load_cached_stats(NORM_MODES[strs[0]]) is not None:
                         self.logger.print(f'Use cached mean/std of training dataset with normal classes {self.normal_classes}')
                         mean, std = self.load_cached_stats(NORM_MODES[strs[0]])
+                    elif load is not None and load.pop('mode', STD_NORM) == STD_NORM:
+                        self.logger.print(f'Loaded mean/std from model snapshot with normal classes {self.normal_classes}')
+                        mean = load['mean']
+                        std = load['std']
                     else:
                         if train_dataset is None:
                             raise ValueError(
@@ -328,8 +342,10 @@ class TorchvisionDataset(BaseADDataset):
                         for x, _, _ in tqdm(loader, desc=desc):
                             acc.add(x.permute(1, 0, 2, 3).flatten(1).permute(1, 0))
                         mean, std = acc.mean(), acc.std()
-                        self.cache_stats(mean, std, NORM_MODES[strs[0]])
+                        if cache:
+                            self.cache_stats(mean, std, NORM_MODES[strs[0]])
                     norm = transforms.Normalize(mean, std, inplace=False)
+                    statistics = {'mean': mean, 'std': std, 'mode': STD_NORM}
                 else:
                     if train_dataset is None:
                         raise ValueError(
@@ -348,10 +364,12 @@ class TorchvisionDataset(BaseADDataset):
                         GlobalContrastNormalization(scale='l1'),
                         transforms.Normalize([tmin] * all_x.size(1), [tmax - tmin] * all_x.size(1), inplace=False)
                     ])
+                    statistics = {'mean': [tmin] * all_x.size(1), 'std': [tmax - tmin] * all_x.size(1), 'mode': GCN_NORM}
                 for i in train_str_pos:
                     self.train_transform.transforms[i] = norm
                 for i in test_str_pos:
                     self.test_transform.transforms[i] = norm
+        return statistics
 
     def load_cached_stats(self, norm_mode: int) -> Tuple[torch.Tensor, torch.Tensor]:  # returns mean and std of dataset
         """
@@ -504,6 +522,10 @@ class CombinedDataset(TorchvisionDataset):
         self.anomalous_label = 1 if self.nominal_label == 0 else 0
         self.logger = self.normal.logger
         self.limit_samples = self.oe.limit_samples
+
+    @property
+    def ds_statistics(self):
+        return self.normal.ds_statistics
 
     def n_normal_anomalous(self, train=True) -> dict:
         """

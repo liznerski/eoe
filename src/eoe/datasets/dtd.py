@@ -1,5 +1,5 @@
 from multiprocessing import shared_memory
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Dict
 
 import PIL.Image
 import numpy as np
@@ -21,14 +21,15 @@ class ADDTD(TorchvisionDataset):
     def __init__(self, root: str, normal_classes: List[int], nominal_label: int,
                  train_transform: transforms.Compose, test_transform: transforms.Compose, 
                  raw_shape: Tuple[int, int, int], logger: Logger = None, limit_samples: Union[int, List[int]] = np.infty,
-                 train_conditional_transform: ConditionalCompose = None, test_conditional_transform: ConditionalCompose = None):
+                 train_conditional_transform: ConditionalCompose = None, test_conditional_transform: ConditionalCompose = None,
+                 ds_statistics: Dict = None, ):
         """
         AD dataset for DTD (describable textures, https://www.robots.ox.ac.uk/~vgg/data/dtd/).
         Implements :class:`eoe.datasets.bases.TorchvisionDataset`.
         """
         super().__init__(
             root, normal_classes, nominal_label, train_transform, test_transform, 47, raw_shape, logger, limit_samples,
-            train_conditional_transform, test_conditional_transform
+            train_conditional_transform, test_conditional_transform, ds_statistics=ds_statistics
         )
 
         self._train_set = DTD(

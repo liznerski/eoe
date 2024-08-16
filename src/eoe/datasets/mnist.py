@@ -1,4 +1,4 @@
-from typing import Tuple, List, Union
+from typing import Tuple, List, Union, Dict
 
 import numpy as np
 import torch
@@ -16,11 +16,12 @@ class ADMNIST(TorchvisionDataset):
     def __init__(self, root: str, normal_classes: List[int], nominal_label: int,
                  train_transform: transforms.Compose, test_transform: transforms.Compose, 
                  raw_shape: Tuple[int, int, int], logger: Logger = None, limit_samples: Union[int, List[int]] = np.infty,
-                 train_conditional_transform: ConditionalCompose = None, test_conditional_transform: ConditionalCompose = None):
+                 train_conditional_transform: ConditionalCompose = None, test_conditional_transform: ConditionalCompose = None,
+                 ds_statistics: Dict = None, ):
         """ AD dataset for MNIST. Implements :class:`eoe.datasets.bases.TorchvisionDataset`. """
         super().__init__(
             root, normal_classes, nominal_label, train_transform, test_transform, 10, raw_shape, logger, limit_samples,
-            train_conditional_transform, test_conditional_transform
+            train_conditional_transform, test_conditional_transform, ds_statistics=ds_statistics
         )
 
         self._train_set = MNIST(
@@ -87,11 +88,12 @@ class ADEMNIST(TorchvisionDataset):
     def __init__(self, root: str, normal_classes: List[int], nominal_label: int,
                  train_transform: transforms.Compose, test_transform: transforms.Compose,
                  raw_shape: Tuple[int, int, int], logger: Logger = None, limit_samples: Union[int, List[int]] = np.infty,
-                 train_conditional_transform: ConditionalCompose = None, test_conditional_transform: ConditionalCompose = None):
+                 train_conditional_transform: ConditionalCompose = None, test_conditional_transform: ConditionalCompose = None,
+                 ds_statistics: Dict = None, ):
         """ AD dataset for EMNIST. Implements :class:`eoe.datasets.bases.TorchvisionDataset`. """
         super().__init__(
             root, normal_classes, nominal_label, train_transform, test_transform, 10, raw_shape, logger, limit_samples,
-            train_conditional_transform, test_conditional_transform
+            train_conditional_transform, test_conditional_transform, ds_statistics=ds_statistics
         )
 
         self._train_set = EMNIST(

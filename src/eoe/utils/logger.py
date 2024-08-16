@@ -9,7 +9,7 @@ import warnings
 from collections import deque
 from copy import deepcopy
 from datetime import datetime
-from typing import List, Tuple, Mapping, Union, Callable
+from typing import List, Tuple, Mapping, Union, Callable, Dict
 from itertools import cycle
 
 import cv2
@@ -315,7 +315,8 @@ class Logger(object):
             with open(outfile, 'w') as writer:
                 json.dump(dic, writer, cls=JsonEncoder, indent=3)
 
-    def snapshot(self, name: str, net: torch.nn.Module, opt: Optimizer = None, sched: _LRScheduler = None, epoch: int = None):
+    def snapshot(self, name: str, net: torch.nn.Module, opt: Optimizer = None, sched: _LRScheduler = None, epoch: int = None,
+                 ds_statistics: Dict = None):
         """
         Writes a snapshot of the training, i.e., network weights, optimizer state, and scheduler state to a file
         in the log directory.
@@ -324,13 +325,14 @@ class Logger(object):
         @param opt: the optimizer used.
         @param sched: the learning rate scheduler used.
         @param epoch: the current epoch.
+        @param ds_statistics: statistics used for normalizing the datasets. Will be reused when loading the snapshot later.
         """
         if self.active:
             outfile = pt.join(self.dir, 'snapshots', f'{name}.pt')
             os.makedirs(os.path.dirname(outfile), exist_ok=True)
             odic, sdic = opt.state_dict() if opt is not None else opt, sched.state_dict() if sched is not None else sched
             torch.save(
-                {'net': net.state_dict(), 'opt': odic, 'sched': sdic, 'epoch': epoch}
+                {'net': net.state_dict(), 'opt': odic, 'sched': sdic, 'epoch': epoch, 'ds_statistics': ds_statistics}
                 , outfile
             )
             return outfile
