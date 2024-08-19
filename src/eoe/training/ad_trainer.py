@@ -1,6 +1,6 @@
 from abc import abstractmethod, ABC
 from copy import deepcopy
-from typing import Union, List, Tuple, Generic, TypeVar
+from typing import Union, List, Tuple, Generic, TypeVar, Optional
 
 import os
 import numpy as np
@@ -248,7 +248,8 @@ class ADTrainer(ABC):
                 ds = load_dataset(
                     self.dsstr, self.datapath, self.get_nominal_classes(c), 0,
                     self.train_transform, self.test_transform, self.logger, self.oe_dsstr,
-                    self.oe_limit_samples, self.oe_limit_classes, self.msms
+                    self.oe_limit_samples, self.oe_limit_classes, self.msms,
+                    ds_statistics=self.load_ds_statistics(cur_load)
                 ) if self.ds is None else self.ds
                 ADImageNet21k.img_cache_size = orig_cache_size
 
@@ -295,7 +296,9 @@ class ADTrainer(ABC):
                 self.logger.plot_many(eval_cls_prcs.means(True), classes, name='eval_intermediate_prc', step=c*run_seeds+seed)
 
                 if model is not None:
-                    self.logger.snapshot(f'snapshot_cls{c}_it{seed}', model, epoch=self.epochs)
+                    self.logger.snapshot(
+                        f'snapshot_cls{c}_it{seed}', model, epoch=self.epochs, ds_statistics=ds.ds_statistics
+                    )
                     if not ADTrainer.KEEP_SNAPSHOT_IN_RAM:
                         models[c][-1] = None
 
@@ -590,6 +593,13 @@ class ADTrainer(ABC):
                 self.logger.print(f'Froze gradients for parts of the AD model.')
 
         return epoch
+
+    def load_ds_statistics(self, path: str) -> Optional[dict]:
+        if path is not None:
+            snapshot = self.unify_snapshot_style(torch.load(path))
+            return snapshot.pop('ds_statistics', None)
+        else:
+            return None
 
     def unify_snapshot_style(self, snapshot: dict) -> dict:
         if "net" in snapshot and isinstance(snapshot['net'], dict):  # EOE style

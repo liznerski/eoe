@@ -308,7 +308,8 @@ All models that are in the package `xad.models.custom` and inherit `xad.models.c
 Per default, any CustomNet extracts features using its *self.feature_model* module---which needs to be set for any CustomNet---passes those through a prediction head if **--custom-model-add-prediction-head** is True, and returns the outcome.
 
 You can manually redefine the data transformation pipeline.
-The default one for training resizes all images to 256x256, applies mild random color jitter, random horizontal flips, random crop to 224x224, transfroms the images to PyTorch tensors, and standardizes the data with an automatically extracted mean and std of the training data. Note that for the latter, the code caches the dataset statsistics in a file `stats_cache.json` in the dataset folder. If you change the dataset, please remove this cache file.  
+The default one for training resizes all images to 256x256, applies mild random color jitter, random horizontal flips, random crop to 224x224, transfroms the images to PyTorch tensors, and standardizes the data with an automatically extracted mean and std of the training data. 
+The mean and std are stored in the model snapshot and will be reused for inference.
 
 # Need help?
 If you find any bugs, have questions, need help modifying EOE, or want to get in touch in general, feel free to write us an [email](mailto:liznerski@cs.uni-kl.de)!

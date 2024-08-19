@@ -1,6 +1,6 @@
 import os.path as pt
 import sys
-from typing import List, Tuple, Callable, Union
+from typing import List, Tuple, Callable, Union, Dict
 
 import numpy as np
 import torch
@@ -21,7 +21,8 @@ class ADImageNetOE(TorchvisionDataset):
     def __init__(self, root: str, normal_classes: List[int], nominal_label: int,
                  train_transform: transforms.Compose, test_transform: transforms.Compose, 
                  raw_shape: Tuple[int, int, int], logger: Logger = None, limit_samples: Union[int, List[int]] = np.infty,
-                 train_conditional_transform: ConditionalCompose = None, test_conditional_transform: ConditionalCompose = None):
+                 train_conditional_transform: ConditionalCompose = None, test_conditional_transform: ConditionalCompose = None,
+                 ds_statistics: Dict = None, ):
         """
         AD dataset for ImageNet-1k. Implements :class:`eoe.datasets.bases.TorchvisionDataset`.
         Since we use ImageNet-30 (see :class:`eoe.datasets.imagenet.ADImageNet`) for AD benchmarks, this dataset is merely
@@ -33,7 +34,7 @@ class ADImageNetOE(TorchvisionDataset):
         root = pt.join(root, self.base_folder)
         super().__init__(
             root, normal_classes, nominal_label, train_transform, test_transform, 30, raw_shape, logger, limit_samples,
-            train_conditional_transform, test_conditional_transform
+            train_conditional_transform, test_conditional_transform, ds_statistics=ds_statistics
         )
 
         self._train_set = MyImageNetOE(

@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import List, Union, Tuple
+from typing import List, Union, Tuple, Dict
 
 import numpy as np
 from torchvision.transforms import Resize, Compose
@@ -237,7 +237,7 @@ def get_raw_shape(train_transform: Compose, dataset_name: str) -> Tuple[int, int
 def load_dataset(dataset_name: str, data_path: str, normal_classes: List[int], nominal_label: int,
                  train_transform: Compose, test_transform: Compose, logger: Logger = None,
                  oe_name: str = None, oe_limit_samples: Union[int, List[int]] = np.infty, oe_limit_classes: int = np.infty,
-                 msms: List[MSM] = ()) -> TorchvisionDataset:
+                 msms: List[MSM] = (), ds_statistics: Dict = None) -> TorchvisionDataset:
     """
     Prepares a dataset, includes setting up all the necessary attributes such as a list of filepaths and labels.
     Requires a list of normal classes that determines the labels and which classes are available during training.
@@ -269,6 +269,8 @@ def load_dataset(dataset_name: str, data_path: str, normal_classes: List[int], n
         Note that the typical OE dataset implementations (80MTI, ImageNet-21k) come without classes. For these OE datasets
         this parameter has no effect.
     @param msms: A list of MSMs that are to be applied to the dataset samples. See :class:`MSM` above.
+    @param ds_statistics: An optional dictionary of dataset statsitics (e.g., mean and std) to be used for
+        automatically updating the transforms (see :method:`eoe.datasets.bases._update_transforms`).
     @return: the prepared TorchvisionDataset instance.
     """
 
@@ -318,6 +320,7 @@ def load_dataset(dataset_name: str, data_path: str, normal_classes: List[int], n
             data_path, train_classes, train_label, total_train_transform, total_test_transform, raw_shape, logger, limit,
             train_conditional_transform, test_conditional_transform
         )
+        kwargs['ds_statistics'] = ds_statistics
 
         if DS_CHOICES[name]['oe_only']:
             assert normal_dataset is not None, f"{name} can only be used as OE!"
