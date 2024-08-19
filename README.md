@@ -305,7 +305,7 @@ For inference, use `eoe/src/eoe/main/inference_custom.py`. Similar to training, 
 * [**--custom-model-add-prediction-head**, optional]: Adds a randomly-initialized prediction head with either 256 output neurons (HSC, ...) or 1 neuron (BCE, focal, ...) to the model.
 
 All models that are in the package `xad.models.custom` and inherit `xad.models.custom_base.CustomNet` become available for training and inference.
-Per default, any CustomNet extracts features using its *self.feature_model* module---which needs to be set for any CustomNet---passes those through a prediction head if **--custom-model-add-prediction-head** is True, and returns the outcome.
+Per default, any CustomNet extracts features using its *self.feature_model* module---which needs to be set for any CustomNet---,passes those through a prediction head if **--custom-model-add-prediction-head** is True, and returns the outcome.
 
 You can manually redefine the data transformation pipeline.
 The default one for training resizes all images to 256x256, applies mild random color jitter, random horizontal flips, random crop to 224x224, transfroms the images to PyTorch tensors, and standardizes the data with an automatically extracted mean and std of the training data. 
