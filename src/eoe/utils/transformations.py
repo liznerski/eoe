@@ -7,7 +7,7 @@ import torch
 import torchvision.transforms as transforms
 from PIL import Image
 from PIL.ImageFilter import GaussianBlur, UnsharpMask
-from kornia import gaussian_blur2d
+from kornia.filters import gaussian_blur2d
 from torch import Tensor
 from torchvision.transforms import Compose
 from torchvision.transforms.functional import to_tensor, to_pil_image
