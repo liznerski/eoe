@@ -18,7 +18,8 @@ DS_CHOICES['custom'] = {
     'str_labels': []  # is automatically extracted for custom datasets, thus can be ignored
 }
 
-if __name__ == '__main__':
+
+def run():
     custom_models = {
         clz_name: clz for clz_name, clz in inspect.getmembers(custom_models_pck)
         if isinstance(clz, type) and issubclass(clz, CustomNet) and clz != CustomNet
@@ -159,3 +160,7 @@ if __name__ == '__main__':
         oe_limit_samples=args.oe_size, dataset_path=args.custom_dataset_path, logpath=args.log_path
     )
     trainer.run([0], args.iterations, [[args.custom_model_snapshot] * args.iterations], test=False)
+
+
+if __name__ == '__main__':
+    run()
