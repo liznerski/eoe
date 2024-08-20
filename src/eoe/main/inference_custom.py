@@ -62,6 +62,19 @@ if __name__ == '__main__':
             help="Adds a randomly-initialized prediction head with either "
                  "256 output neurons (HSC, ...) or 1 neuron (BCE, focal, ...) to the custom model."
         )
+        group.add_argument(
+            '--image-resize', type=int, default=(256, ), nargs='*',
+            help="When using the default data transformation pipeline, "
+                 "this sets the target size of the resize transformation. --image-resize accepts one or two integers. "
+                 "If there are two, they define the target height and width. If there is one, the smaller edge "
+                 "will be matched to this number. "
+        )
+        group.add_argument(
+            '--image-crop', type=int, default=(224, 224), nargs=2,
+            help="When using the default data transformation pipeline, "
+                 "this sets the target height and width of the center crop transformation. "
+                 "If either height or width are less or equal to 0, no center crop will be used. "
+        )
         parser.set_defaults(
             comment='{obj}_custom_inference',
             objective='hsc',
@@ -76,23 +89,34 @@ if __name__ == '__main__':
             classes=None,
             iterations=1
         )
+
+    def modify_args(args):
+        if args.dataset is not None and args.dataset != "custom":
+            raise ValueError(f"The argument dataset needs to be 'custom' for custom training.")
+        if args.load is not None:
+            raise NotImplementedError(f"Continuing an experiment for custom training is not supported at the moment.")
+        if args.classes is not None:
+            raise ValueError(f"The argument classes is not supported for custom training.")
+        args.dataset = 'custom'
+        args.iterations = 1  # there's no point in evaluating multiple times
+        if args.ad_mode != 'one_vs_rest':
+            print(
+                f"The AD mode is changed to {args.ad_mode}. Custom datasets ignore the AD mode. ",
+                file=sys.stderr
+            )
+        if len(args.image_resize) > 2:
+            raise ValueError(
+                f"--image-resize accepts one or two integers, but {len(args.image_resize)} ({args.image_resize}) are given. "
+                f"If there are two integers, they define the target height and width. "
+                f"If there is one, the smaller edge will be matched to this number."
+            )
+
+
     args = default_argsparse(
         lambda s: f"{s} This specific script comes with a default configuration for custom datasets.",
-        modify_parser
+        modify_parser, modify_args
     )
-    if args.dataset is not None and args.dataset != "custom":
-        raise ValueError(f"The argument dataset needs to be 'custom' for custom training.")
-    if args.load is not None:
-        raise NotImplementedError(f"Continuing an experiment for custom training is not supported at the moment.")
-    if args.classes is not None:
-        raise ValueError(f"The argument classes is not supported for custom training.")
-    args.dataset = 'custom'
-    args.iterations = 1  # there's no point in evaluating multiple times
-    if args.ad_mode != 'one_vs_rest':
-        print(
-            f"The AD mode is changed to {args.ad_mode}. Custom datasets ignore the AD mode. ",
-            file=sys.stderr
-        )
+
     DS_CHOICES['custom']['default_size'] = args.custom_dataset_default_size
     ADCustomDS.eval_only = True
     ADCustomDS.base_folder = "."
@@ -100,12 +124,21 @@ if __name__ == '__main__':
     args.comment = args.comment.format(
         obj=args.objective, admode='',
     )
-    train_transform = val_transform = Compose([  # change this to use different data transforms for testing
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        'normalize'
-    ])
+    if all([c > 0 for c in args.image_crop]):
+        # change this to use different data transforms for inference when args.image_crop contains positive numbers only
+        train_transform = val_transform = Compose([
+            transforms.Resize(args.image_resize),
+            transforms.CenterCrop(args.image_crop),
+            transforms.ToTensor(),
+            'normalize'
+        ])
+    else:
+        # change this to use different data transforms for inference when args.image_crop contains any non-positive number
+        train_transform = val_transform = Compose([
+            transforms.Resize(args.image_resize),
+            transforms.ToTensor(),
+            'normalize'
+        ])
     model = custom_models[args.custom_model_name](
         prediction_head=args.custom_model_add_prediction_head,
         clf=args.objective in ('bce', 'focal'),

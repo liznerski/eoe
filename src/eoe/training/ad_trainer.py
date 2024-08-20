@@ -326,19 +326,22 @@ class ADTrainer(ABC):
             print(f'Training: Overall {mean_auc*100:04.2f}% +- {std_auc*100:04.2f} AUC.')
 
         # evaluation: compute cls-wise roc curves and combine in a final overview roc plot
-        mean_auc = np.mean([m.auc for m in eval_cls_rocs.means() if m is not None]) 
-        std_auc = np.std([m.auc for m in eval_cls_rocs.means() if m is not None])
-        self.logger.plot_many(eval_cls_rocs.means(), classes, name='eval_roc')
-        mean_avg_prec = np.mean([m.avg_prec for m in eval_cls_prcs.means() if m is not None]) 
-        std_avg_prec = np.std([m.avg_prec for m in eval_cls_prcs.means() if m is not None])
-        self.logger.plot_many(eval_cls_prcs.means(), classes, name='eval_prc')
+        if test:
+            mean_auc = np.mean([m.auc for m in eval_cls_rocs.means() if m is not None])
+            std_auc = np.std([m.auc for m in eval_cls_rocs.means() if m is not None])
+            self.logger.plot_many(eval_cls_rocs.means(), classes, name='eval_roc')
+            mean_avg_prec = np.mean([m.avg_prec for m in eval_cls_prcs.means() if m is not None])
+            std_avg_prec = np.std([m.avg_prec for m in eval_cls_prcs.means() if m is not None])
+            self.logger.plot_many(eval_cls_prcs.means(), classes, name='eval_prc')
 
-        # print some overview of the achieved scores
-        self.logger.logtxt('--------------- OVERVIEW ------------------')
-        self.logger.logtxt(f'Eval: Overall {mean_avg_prec*100:04.2f}% +- {std_avg_prec*100:04.2f}% AvgPrec.')
-        for auc, std, cstr in ((a.auc, a.std, c) for a, c in zip(eval_cls_rocs.means(), classes) if a is not None):
-            self.logger.logtxt(f'Eval: Class "{cstr}" yields {auc*100:04.2f}% +- {std*100:04.2f}% AUC.')
-        self.logger.logtxt(f'Eval: Overall {mean_auc*100:04.2f}% +- {std_auc*100:04.2f}% AUC.')
+            # print some overview of the achieved scores
+            self.logger.logtxt('--------------- OVERVIEW ------------------')
+            self.logger.logtxt(f'Eval: Overall {mean_avg_prec*100:04.2f}% +- {std_avg_prec*100:04.2f}% AvgPrec.')
+            for auc, std, cstr in ((a.auc, a.std, c) for a, c in zip(eval_cls_rocs.means(), classes) if a is not None):
+                self.logger.logtxt(f'Eval: Class "{cstr}" yields {auc*100:04.2f}% +- {std*100:04.2f}% AUC.')
+            self.logger.logtxt(f'Eval: Overall {mean_auc*100:04.2f}% +- {std_auc*100:04.2f}% AUC.')
+        else:
+            mean_auc = std_auc = mean_avg_prec = np.nan
 
         self.logger.logjson('results', {
             'eval_mean_auc': mean_auc, 'eval_std_auc': std_auc, 'eval_mean_avg_prec': mean_avg_prec,
